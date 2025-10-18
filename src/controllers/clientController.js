@@ -13,14 +13,14 @@ const FIELD_MAP = {
   tipoDocumento: 'tipo_documento',
   numeroDocumento: 'numero_documento',
   correoElectronico: 'correo_electronico',
-  telefono: 'telefono',
+/*   telefono: 'telefono',
   direccion: 'direccion',
   ciudad: 'ciudad',
   pais: 'pais',
-  estado: 'estado',
+  estado: 'estado', */
   fechaCreacion: 'fecha_creacion',
   registradoPor: 'registrado_por',
-  notas: 'notas',
+  /* notas: 'notas', */
 };
 
 const REQUIRED_FIELDS = [
