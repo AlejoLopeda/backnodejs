@@ -3,27 +3,41 @@ const path = require('path');
 const db = require('../db');
 
 const MIGRATION_FILE = path.join(__dirname, '..', '..', 'migrations', 'migrate_up.sql');
+const ALTER_TERCEROS_MIGRATION = path.join(
+  __dirname,
+  '..',
+  '..',
+  'migrations',
+  'migrate_clients_alter_terceros.sql'
+);
+const DROP_UNUSED_COLUMNS_MIGRATION = path.join(
+  __dirname,
+  '..',
+  '..',
+  'migrations',
+  'migrate_clients_drop_unused.sql'
+);
+const BACKUP_UNUSED_COLUMNS_MIGRATION = path.join(
+  __dirname,
+  '..',
+  '..',
+  'migrations',
+  'migrate_clients_backup_unused.sql'
+);
 
 const INSERTABLE_FIELDS = [
   'id_cliente',
-  'tipo_cliente',
+  'tipo_tercero',
   'nombre_razon_social',
   'tipo_documento',
   'numero_documento',
   'correo_electronico',
   'telefono',
-  'direccion',
-  'ciudad',
-  'pais',
-  'estado',
   'fecha_creacion',
   'registrado_por',
-  'notas',
 ];
 
-const UPDATABLE_FIELDS = INSERTABLE_FIELDS.filter(
-  (field) => field !== 'id_cliente' && field !== 'fecha_creacion'
-);
+const UPDATABLE_FIELDS = INSERTABLE_FIELDS.filter((field) => field !== 'id_cliente' && field !== 'fecha_creacion');
 
 async function ensureClientesSchema() {
   const checkQuery = `
@@ -36,12 +50,42 @@ async function ensureClientesSchema() {
   `;
 
   const { rows } = await db.query(checkQuery);
-  if (rows[0]?.existe) {
-    return;
+  if (!rows[0]?.existe) {
+    const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
+    await db.query(migrationSql);
   }
 
-  const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
-  await db.query(migrationSql);
+  // Ajuste de esquema: columna tipo_tercero y enum correspondiente
+  const colQuery = `
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'clientes' AND column_name = 'tipo_tercero'
+    ) AS tiene;
+  `;
+  const chk = await db.query(colQuery);
+  if (!chk.rows[0]?.tiene) {
+    const alterSql = fs.readFileSync(ALTER_TERCEROS_MIGRATION, 'utf8');
+    await db.query(alterSql);
+  }
+
+  // Retirar columnas ya no utilizadas si existen
+  const colsToDrop = ['direccion','ciudad','pais','estado','notas'];
+  const colsQuery = `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clientes'
+      AND column_name = ANY($1)
+  `;
+  const { rows: existingCols } = await db.query(colsQuery, [colsToDrop]);
+  if (existingCols && existingCols.length) {
+    // Primero respalda
+    const backupSql = fs.readFileSync(BACKUP_UNUSED_COLUMNS_MIGRATION, 'utf8');
+    await db.query(backupSql);
+    // Luego elimina
+    const dropSql = fs.readFileSync(DROP_UNUSED_COLUMNS_MIGRATION, 'utf8');
+    await db.query(dropSql);
+  }
 }
 
 function buildInsertStatement(data) {
@@ -105,7 +149,16 @@ async function createClient(data) {
 
 async function getClients() {
   const query = `
-    SELECT *
+    SELECT 
+      id_cliente,
+      tipo_tercero,
+      nombre_razon_social,
+      tipo_documento,
+      numero_documento,
+      correo_electronico,
+      telefono,
+      fecha_creacion,
+      registrado_por
     FROM public.clientes
     ORDER BY nombre_razon_social ASC;
   `;
@@ -115,7 +168,16 @@ async function getClients() {
 
 async function getClientById(idCliente) {
   const query = `
-    SELECT *
+    SELECT 
+      id_cliente,
+      tipo_tercero,
+      nombre_razon_social,
+      tipo_documento,
+      numero_documento,
+      correo_electronico,
+      telefono,
+      fecha_creacion,
+      registrado_por
     FROM public.clientes
     WHERE id_cliente = $1;
   `;
