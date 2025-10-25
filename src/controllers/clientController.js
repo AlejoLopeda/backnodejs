@@ -1,30 +1,24 @@
 const clientModel = require('../models/clientModel');
 
-const TIPO_CLIENTE_VALUES = ['Natural', 'Juridica'];
+const TIPO_TERCERO_VALUES = ['Cliente', 'Proveedor'];
 const TIPO_DOCUMENTO_VALUES = ['NIT', 'CC', 'CE', 'RUC', 'DNI'];
-const ESTADO_VALUES = ['Activo', 'Inactivo'];
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/i;
 
 const FIELD_MAP = {
   idCliente: 'id_cliente',
-  tipoCliente: 'tipo_cliente',
+  tipoTercero: 'tipo_tercero',
   nombreRazonSocial: 'nombre_razon_social',
   tipoDocumento: 'tipo_documento',
   numeroDocumento: 'numero_documento',
   correoElectronico: 'correo_electronico',
-/*   telefono: 'telefono',
-  direccion: 'direccion',
-  ciudad: 'ciudad',
-  pais: 'pais',
-  estado: 'estado', */
+  /* telefono: 'telefono', */
   fechaCreacion: 'fecha_creacion',
   registradoPor: 'registrado_por',
-  /* notas: 'notas', */
 };
 
 const REQUIRED_FIELDS = [
-  'tipoCliente',
+  'tipoTercero',
   'nombreRazonSocial',
   'tipoDocumento',
   'numeroDocumento',
@@ -42,13 +36,11 @@ function validateRequiredFields(payload) {
 }
 
 function validateEnumValues(payload) {
-  if (
-    payload.tipoCliente !== undefined &&
-    payload.tipoCliente !== null &&
-    payload.tipoCliente !== '' &&
-    !TIPO_CLIENTE_VALUES.includes(payload.tipoCliente)
-  ) {
-    throw new Error(`tipoCliente debe ser uno de: ${TIPO_CLIENTE_VALUES.join(', ')}`);
+  if (payload.tipoTercero !== undefined &&
+      payload.tipoTercero !== null &&
+      payload.tipoTercero !== '' &&
+      !TIPO_TERCERO_VALUES.includes(payload.tipoTercero)) {
+    throw new Error(`tipoTercero debe ser uno de: ${TIPO_TERCERO_VALUES.join(', ')}`);
   }
 
   if (
@@ -60,14 +52,7 @@ function validateEnumValues(payload) {
     throw new Error(`tipoDocumento debe ser uno de: ${TIPO_DOCUMENTO_VALUES.join(', ')}`);
   }
 
-  if (
-    payload.estado !== undefined &&
-    payload.estado !== null &&
-    payload.estado !== '' &&
-    !ESTADO_VALUES.includes(payload.estado)
-  ) {
-    throw new Error(`estado debe ser uno de: ${ESTADO_VALUES.join(', ')}`);
-  }
+  // estado ya no aplica
 }
 
 function validateEmails(payload) {
