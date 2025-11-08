@@ -1,8 +1,9 @@
-const saleModel = require('../models/saleModel');
+const purchaseModel = require('../models/purchaseModel');
 
 // Límites y utilidades de validación
 const LIMITS = {
   maxItems: 100,
+  maxNotesLength: 1000,
   maxQuantity: 100000,
   maxUnitPrice: 100000000, // 1e8
   maxMetodoPagoLength: 50,
@@ -28,9 +29,9 @@ function validateFecha(fecha) {
 }
 
 function validateHeader(payload) {
-  if (payload.idCliente !== undefined && payload.idCliente !== null) {
-    if (!isPositiveInt(payload.idCliente)) {
-      throw new Error('idCliente debe ser un entero positivo');
+  if (payload.idProveedor !== undefined && payload.idProveedor !== null) {
+    if (!isPositiveInt(payload.idProveedor)) {
+      throw new Error('idProveedor debe ser un entero positivo');
     }
   }
   if (payload.metodoPago !== undefined && payload.metodoPago !== null) {
@@ -39,6 +40,14 @@ function validateHeader(payload) {
     }
     if (payload.metodoPago.length > LIMITS.maxMetodoPagoLength) {
       throw new Error(`metodoPago no debe exceder ${LIMITS.maxMetodoPagoLength} caracteres`);
+    }
+  }
+  if (payload.notas !== undefined && payload.notas !== null) {
+    if (typeof payload.notas !== 'string') {
+      throw new Error('notas debe ser texto');
+    }
+    if (payload.notas.length > LIMITS.maxNotesLength) {
+      throw new Error(`notas no debe exceder ${LIMITS.maxNotesLength} caracteres`);
     }
   }
   validateFecha(payload.fecha);
@@ -63,8 +72,8 @@ function mapAndValidateItems(items) {
     if (!isPositiveInt(productId)) {
       throw new Error(`items[${i}].productId debe ser un entero positivo`);
     }
-    if (!isPositiveInt(quantity) || Number(quantity) > LIMITS.maxQuantity) {
-      throw new Error(`items[${i}].quantity debe ser un entero > 0 y <= ${LIMITS.maxQuantity}`);
+    if (!isPositiveInt(quantity)) {
+      throw new Error(`items[${i}].quantity debe ser un entero > 0`);
     }
     if (!isNonNegativeNumber(unitPrice) || Number(unitPrice) > LIMITS.maxUnitPrice) {
       throw new Error(`items[${i}].unitPrice debe ser un número entre 0 y ${LIMITS.maxUnitPrice}`);
@@ -78,11 +87,12 @@ function mapAndValidateItems(items) {
 }
 
 function handleDbError(error, res) {
+  // Código PGError: https://www.postgresql.org/docs/current/errcodes-appendix.html
   if (!error || !error.code) return null;
   if (error.code === '23503') {
     const detail = (error.detail || '').toLowerCase();
-    if (detail.includes('id_cliente')) {
-      res.status(400).json({ error: 'idCliente no existe (violación de llave foránea)' });
+    if (detail.includes('id_proveedor')) {
+      res.status(400).json({ error: 'idProveedor no existe (violación de llave foránea)' });
       return true;
     }
     if (detail.includes('id_producto')) {
@@ -101,15 +111,19 @@ function handleDbError(error, res) {
   return null;
 }
 
-// Mapeo camelCase -> snake_case para el encabezado de venta
+// Mapeo camelCase -> snake_case para el encabezado de compra
 const FIELD_MAP = {
-  idVenta: 'id_venta',
-  idCliente: 'id_cliente',
+  idCompra: 'id_compra',
+  idProveedor: 'id_proveedor',
   fecha: 'fecha',
   metodoPago: 'metodo_pago',
+  notas: 'notas',
 };
 
-// La validación de items está reforzada en mapAndValidateItems
+function validarItems(items) {
+  // se mantiene para compatibilidad con imports existentes; las validaciones reales están en mapAndValidateItems
+  validateItemsLimits(items);
+}
 
 function mapHeaderToColumns(payload) {
   const mapped = {};
@@ -123,9 +137,15 @@ function mapHeaderToColumns(payload) {
   return mapped;
 }
 
-// mapAndValidateItems produce las columnas correctas
+function mapItemsToColumns(items) {
+  return items.map((it) => ({
+    id_producto: it.productId,
+    cantidad: Number(it.quantity),
+    precio_unitario: Number(Number(it.unitPrice).toFixed(2)),
+  }));
+}
 
-async function createSale(req, res) {
+async function createPurchase(req, res) {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Usuario no autenticado' });
@@ -135,11 +155,12 @@ async function createSale(req, res) {
     const items = mapAndValidateItems(payload.items);
     const header = mapHeaderToColumns(payload);
 
-    const created = await saleModel.createSale({
-      id_cliente: header.id_cliente || null,
+    const created = await purchaseModel.createPurchase({
+      id_proveedor: header.id_proveedor || null,
       id_usuario: userId,
       fecha: header.fecha,
       metodo_pago: header.metodo_pago,
+      notas: header.notas,
       items,
     });
 
@@ -147,48 +168,49 @@ async function createSale(req, res) {
   } catch (error) {
     if (handleDbError(error, res)) return;
     if (error && error.message) return res.status(400).json({ error: error.message });
-    console.error('Error al crear venta:', error);
+    console.error('Error al crear compra:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
-async function listSales(req, res) {
+async function listPurchases(req, res) {
   try {
     const userId = req.user?.id;
-    const rows = await saleModel.getSales(userId);
+    const rows = await purchaseModel.getPurchases(userId);
     return res.status(200).json(rows);
   } catch (error) {
-    console.error('Error al listar ventas:', error);
+    console.error('Error al listar compras:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
-async function getSale(req, res) {
+async function getPurchase(req, res) {
   try {
     const userId = req.user?.id;
-    const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    const { idCompra } = req.params;
+    if (!isPositiveInt(idCompra)) {
+      return res.status(400).json({ error: 'idCompra debe ser un entero positivo' });
     }
-    const sale = await saleModel.getSaleById(idVenta, userId);
-    if (!sale) return res.status(404).json({ error: 'Venta no encontrada' });
-    return res.status(200).json(sale);
+    const compra = await purchaseModel.getPurchaseById(idCompra, userId);
+    if (!compra) return res.status(404).json({ error: 'Compra no encontrada' });
+    return res.status(200).json(compra);
   } catch (error) {
-    console.error('Error al obtener venta:', error);
+    console.error('Error al obtener compra:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
-async function updateSale(req, res) {
+async function updatePurchase(req, res) {
   try {
     const userId = req.user?.id;
-    const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    const { idCompra } = req.params;
+    if (!isPositiveInt(idCompra)) {
+      return res.status(400).json({ error: 'idCompra debe ser un entero positivo' });
     }
     const payload = req.body || {};
 
     if (payload.items !== undefined) {
+      // Validar y mapear solo si viene items
       payload.items = mapAndValidateItems(payload.items);
     }
 
@@ -196,44 +218,44 @@ async function updateSale(req, res) {
     const header = mapHeaderToColumns(payload);
     const items = Array.isArray(payload.items) ? payload.items : undefined;
 
-    const updated = await saleModel.updateSale(idVenta, userId, {
-      id_cliente: header.id_cliente,
+    const updated = await purchaseModel.updatePurchase(idCompra, userId, {
+      id_proveedor: header.id_proveedor,
       fecha: header.fecha,
       metodo_pago: header.metodo_pago,
+      notas: header.notas,
       items,
     });
 
-    if (!updated) return res.status(404).json({ error: 'Venta no encontrada' });
+    if (!updated) return res.status(404).json({ error: 'Compra no encontrada' });
     return res.status(200).json(updated);
   } catch (error) {
     if (handleDbError(error, res)) return;
     if (error && error.message) return res.status(400).json({ error: error.message });
-    console.error('Error al actualizar venta:', error);
+    console.error('Error al actualizar compra:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
-async function deleteSale(req, res) {
+async function deletePurchase(req, res) {
   try {
     const userId = req.user?.id;
-    const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    const { idCompra } = req.params;
+    if (!isPositiveInt(idCompra)) {
+      return res.status(400).json({ error: 'idCompra debe ser un entero positivo' });
     }
-    const deleted = await saleModel.deleteSale(idVenta, userId);
-    if (!deleted) return res.status(404).json({ error: 'Venta no encontrada' });
+    const deleted = await purchaseModel.deletePurchase(idCompra, userId);
+    if (!deleted) return res.status(404).json({ error: 'Compra no encontrada' });
     return res.status(204).send();
   } catch (error) {
-    console.error('Error al eliminar venta:', error);
+    console.error('Error al eliminar compra:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
 module.exports = {
-  createSale,
-  listSales,
-  getSale,
-  updateSale,
-  deleteSale,
+  createPurchase,
+  listPurchases,
+  getPurchase,
+  updatePurchase,
+  deletePurchase,
 };
-
