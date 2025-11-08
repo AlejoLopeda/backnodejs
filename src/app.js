@@ -5,11 +5,15 @@ const cors = require('cors');
 const { crearTablaUsuarios } = require('./models/userModel');
 const { ensureClientesSchema } = require('./models/clientModel');
 const { ensureVentasSchema } = require('./models/saleModel');
+const { ensureComprasSchema } = require('./models/purchaseModel');
+const { ensureProductosSchema } = require('./models/productModel');
 
 // Importar rutas
 const userRoutes = require('./routes/userRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const saleRoutes = require('./routes/saleRoutes');
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 const app = express();
 
@@ -22,6 +26,8 @@ app.use(express.json());
 app.use('/usuarios', userRoutes);
 app.use('/clientes', clientRoutes);
 app.use('/ventas', saleRoutes);
+app.use('/compras', purchaseRoutes);
+app.use(['/productos', '/producto'], productRoutes);
 
 (async () => {
   try {
@@ -31,6 +37,10 @@ app.use('/ventas', saleRoutes);
     console.log('Recursos de clientes creados o ya existen');
     await ensureVentasSchema();
     console.log('Recursos de ventas creados o ya existen');
+    await ensureComprasSchema();
+    console.log('Recursos de compras creados o ya existen');
+    await ensureProductosSchema();
+    console.log('Recursos de productos creados o ya existen');
   } catch (error) {
     console.error('No se pudo inicializar la base de datos:', error.message);
   }
