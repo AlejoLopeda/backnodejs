@@ -1,4 +1,5 @@
 const purchaseModel = require('../models/purchaseModel');
+const auditModel = require('../models/auditModel');
 
 // Límites y utilidades de validación
 const LIMITS = {
@@ -164,6 +165,16 @@ async function createPurchase(req, res) {
       items,
     });
 
+    await auditModel
+      .logEvent({
+        entidad: 'compras',
+        registroId: created.id_compra,
+        accion: 'CREAR',
+        usuarioId: userId,
+        datosNuevos: created,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de compra (create):', err.message));
+
     return res.status(201).json(created);
   } catch (error) {
     if (handleDbError(error, res)) return;
@@ -209,6 +220,11 @@ async function updatePurchase(req, res) {
     }
     const payload = req.body || {};
 
+    const existing = await purchaseModel.getPurchaseById(idCompra, userId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+
     if (payload.items !== undefined) {
       // Validar y mapear solo si viene items
       payload.items = mapAndValidateItems(payload.items);
@@ -227,6 +243,18 @@ async function updatePurchase(req, res) {
     });
 
     if (!updated) return res.status(404).json({ error: 'Compra no encontrada' });
+
+    await auditModel
+      .logEvent({
+        entidad: 'compras',
+        registroId: idCompra,
+        accion: 'ACTUALIZAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+        datosNuevos: updated,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de compra (update):', err.message));
+
     return res.status(200).json(updated);
   } catch (error) {
     if (handleDbError(error, res)) return;
@@ -243,8 +271,25 @@ async function deletePurchase(req, res) {
     if (!isPositiveInt(idCompra)) {
       return res.status(400).json({ error: 'idCompra debe ser un entero positivo' });
     }
+
+    const existing = await purchaseModel.getPurchaseById(idCompra, userId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+
     const deleted = await purchaseModel.deletePurchase(idCompra, userId);
     if (!deleted) return res.status(404).json({ error: 'Compra no encontrada' });
+
+    await auditModel
+      .logEvent({
+        entidad: 'compras',
+        registroId: idCompra,
+        accion: 'ELIMINAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de compra (delete):', err.message));
+
     return res.status(204).send();
   } catch (error) {
     console.error('Error al eliminar compra:', error);

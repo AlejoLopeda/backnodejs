@@ -1,4 +1,5 @@
 const productModel = require('../models/productModel');
+const auditModel = require('../models/auditModel');
 
 const REQUIRED_FIELDS = ['referencia', 'categoria', 'precio', 'nombre', 'cantidad'];
 
@@ -189,12 +190,27 @@ function handleUniqueConstraintError(error, res) {
 
 async function createProduct(req, res) {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
     const payload = req.body || {};
 
     validateRequiredFields(payload);
 
     const productData = mapPayloadToColumns(payload);
     const created = await productModel.createProduct(productData);
+
+    await auditModel
+      .logEvent({
+        entidad: 'productos',
+        registroId: created.id_producto,
+        accion: 'CREAR',
+        usuarioId: userId,
+        datosNuevos: created,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de producto (create):', err.message));
 
     return res.status(201).json(created);
   } catch (error) {
@@ -214,9 +230,19 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const payload = req.body || {};
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
     const idProducto = resolveId(req.params?.idProducto, payload);
     if (!idProducto) {
       return res.status(400).json({ error: 'idProducto es obligatorio' });
+    }
+
+    const existing = await productModel.getProductById(idProducto);
+    if (!existing) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
     const productData = mapPayloadToColumns(payload, { allowPartial: true, excludeFields: ['id_producto'] });
@@ -230,6 +256,17 @@ async function updateProduct(req, res) {
     if (!updated) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
+
+    await auditModel
+      .logEvent({
+        entidad: 'productos',
+        registroId: idProducto,
+        accion: 'ACTUALIZAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+        datosNuevos: updated,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de producto (update):', err.message));
 
     return res.status(200).json(updated);
   } catch (error) {
@@ -249,9 +286,19 @@ async function updateProduct(req, res) {
 async function deleteProduct(req, res) {
   try {
     const payload = req.body || {};
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
     const idProducto = resolveId(req.params?.idProducto, payload);
     if (!idProducto) {
       return res.status(400).json({ error: 'idProducto es obligatorio' });
+    }
+
+    const existing = await productModel.getProductById(idProducto);
+    if (!existing) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
     const deleted = await productModel.deleteProduct(idProducto);
@@ -259,6 +306,16 @@ async function deleteProduct(req, res) {
     if (!deleted) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
+
+    await auditModel
+      .logEvent({
+        entidad: 'productos',
+        registroId: idProducto,
+        accion: 'ELIMINAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de producto (delete):', err.message));
 
     return res.status(204).send();
   } catch (error) {

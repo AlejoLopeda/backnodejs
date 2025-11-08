@@ -7,6 +7,7 @@ const { ensureClientesSchema } = require('./models/clientModel');
 const { ensureVentasSchema } = require('./models/saleModel');
 const { ensureComprasSchema } = require('./models/purchaseModel');
 const { ensureProductosSchema } = require('./models/productModel');
+const { ensureAuditoriaSchema } = require('./models/auditModel');
 
 // Importar rutas
 const userRoutes = require('./routes/userRoutes');
@@ -41,6 +42,8 @@ app.use(['/productos', '/producto'], productRoutes);
     console.log('Recursos de compras creados o ya existen');
     await ensureProductosSchema();
     console.log('Recursos de productos creados o ya existen');
+    await ensureAuditoriaSchema();
+    console.log('Recursos de auditoria creados o ya existen');
   } catch (error) {
     console.error('No se pudo inicializar la base de datos:', error.message);
   }
