@@ -1,4 +1,5 @@
 const saleModel = require('../models/saleModel');
+const auditModel = require('../models/auditModel');
 
 // Límites y utilidades de validación
 const LIMITS = {
@@ -143,6 +144,16 @@ async function createSale(req, res) {
       items,
     });
 
+    await auditModel
+      .logEvent({
+        entidad: 'ventas',
+        registroId: created.id_venta,
+        accion: 'CREAR',
+        usuarioId: userId,
+        datosNuevos: created,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de venta (create):', err.message));
+
     return res.status(201).json(created);
   } catch (error) {
     if (handleDbError(error, res)) return;
@@ -188,6 +199,11 @@ async function updateSale(req, res) {
     }
     const payload = req.body || {};
 
+    const existing = await saleModel.getSaleById(idVenta, userId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
     if (payload.items !== undefined) {
       payload.items = mapAndValidateItems(payload.items);
     }
@@ -204,6 +220,18 @@ async function updateSale(req, res) {
     });
 
     if (!updated) return res.status(404).json({ error: 'Venta no encontrada' });
+
+    await auditModel
+      .logEvent({
+        entidad: 'ventas',
+        registroId: idVenta,
+        accion: 'ACTUALIZAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+        datosNuevos: updated,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de venta (update):', err.message));
+
     return res.status(200).json(updated);
   } catch (error) {
     if (handleDbError(error, res)) return;
@@ -220,8 +248,25 @@ async function deleteSale(req, res) {
     if (!isPositiveInt(idVenta)) {
       return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
     }
+
+    const existing = await saleModel.getSaleById(idVenta, userId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
     const deleted = await saleModel.deleteSale(idVenta, userId);
     if (!deleted) return res.status(404).json({ error: 'Venta no encontrada' });
+
+    await auditModel
+      .logEvent({
+        entidad: 'ventas',
+        registroId: idVenta,
+        accion: 'ELIMINAR',
+        usuarioId: userId,
+        datosPrevios: existing,
+      })
+      .catch((err) => console.error('No se pudo registrar auditoria de venta (delete):', err.message));
+
     return res.status(204).send();
   } catch (error) {
     console.error('Error al eliminar venta:', error);
