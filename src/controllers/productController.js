@@ -188,6 +188,21 @@ function handleUniqueConstraintError(error, res) {
   return false;
 }
 
+async function listProducts(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    const products = await productModel.getAllProducts();
+    return res.status(200).json(products);
+  } catch (error) {
+    console.error('Error al listar productos:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
 async function createProduct(req, res) {
   try {
     const userId = req.user?.id;
@@ -325,6 +340,7 @@ async function deleteProduct(req, res) {
 }
 
 module.exports = {
+  listProducts,
   createProduct,
   updateProduct,
   deleteProduct,

@@ -71,11 +71,14 @@ async function getSaleById(id_venta, id_usuario) {
                'idProducto', vi.id_producto,
                'cantidad', vi.cantidad,
                'precioUnitario', vi.precio_unitario,
-               'precioTotal', vi.precio_total
+               'precioTotal', vi.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
              )
            ) FILTER (WHERE vi.id_item IS NOT NULL), '[]') AS items
     FROM public.ventas v
     LEFT JOIN public.ventas_items vi ON vi.id_venta = v.id_venta
+    LEFT JOIN public.productos p ON p.id_producto::text = vi.id_producto::text
     WHERE v.id_venta = $1 AND v.id_usuario = $2
     GROUP BY v.id_venta;
   `;
@@ -92,16 +95,46 @@ async function getSales(id_usuario) {
                'idProducto', vi.id_producto,
                'cantidad', vi.cantidad,
                'precioUnitario', vi.precio_unitario,
-               'precioTotal', vi.precio_total
+               'precioTotal', vi.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
              )
            ) FILTER (WHERE vi.id_item IS NOT NULL), '[]') AS items
     FROM public.ventas v
     LEFT JOIN public.ventas_items vi ON vi.id_venta = v.id_venta
+    LEFT JOIN public.productos p ON p.id_producto::text = vi.id_producto::text
     WHERE v.id_usuario = $1
     GROUP BY v.id_venta
     ORDER BY v.fecha DESC, v.id_venta DESC;
   `;
   const { rows } = await db.query(query, [id_usuario]);
+  return rows;
+}
+
+async function getSalesByDateRange(id_usuario, fechaInicio, fechaFin) {
+  const query = `
+    SELECT v.*,
+           COALESCE(json_agg(
+             json_build_object(
+               'idItem', vi.id_item,
+               'idProducto', vi.id_producto,
+               'cantidad', vi.cantidad,
+               'precioUnitario', vi.precio_unitario,
+               'precioTotal', vi.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
+             )
+           ) FILTER (WHERE vi.id_item IS NOT NULL), '[]') AS items
+    FROM public.ventas v
+    LEFT JOIN public.ventas_items vi ON vi.id_venta = v.id_venta
+    LEFT JOIN public.productos p ON p.id_producto::text = vi.id_producto::text
+    WHERE v.id_usuario = $1
+      AND v.fecha >= $2
+      AND v.fecha <= $3
+    GROUP BY v.id_venta
+    ORDER BY v.fecha DESC, v.id_venta DESC;
+  `;
+  const { rows } = await db.query(query, [id_usuario, fechaInicio, fechaFin]);
   return rows;
 }
 
@@ -186,8 +219,8 @@ module.exports = {
   ensureVentasSchema,
   createSale,
   getSales,
+  getSalesByDateRange,
   getSaleById,
   updateSale,
   deleteSale,
 };
-

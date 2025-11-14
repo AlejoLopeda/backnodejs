@@ -15,6 +15,7 @@ const clientRoutes = require('./routes/clientRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const productRoutes = require('./routes/productRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/clientes', clientRoutes);
 app.use('/ventas', saleRoutes);
 app.use('/compras', purchaseRoutes);
 app.use(['/productos', '/producto'], productRoutes);
+app.use('/reportes', reportRoutes);
 
 (async () => {
   try {

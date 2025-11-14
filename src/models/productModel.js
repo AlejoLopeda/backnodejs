@@ -89,6 +89,16 @@ async function createProduct(data) {
   return result.rows[0];
 }
 
+async function getAllProducts() {
+  const query = `
+    SELECT *
+    FROM public.productos
+    ORDER BY id_producto;
+  `;
+  const { rows } = await db.query(query);
+  return rows;
+}
+
 async function getProductById(idProducto) {
   const query = `
     SELECT *
@@ -118,6 +128,7 @@ async function deleteProduct(idProducto) {
 module.exports = {
   ensureProductosSchema,
   createProduct,
+  getAllProducts,
   getProductById,
   updateProduct,
   deleteProduct,

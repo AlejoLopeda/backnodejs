@@ -71,11 +71,14 @@ async function getPurchaseById(id_compra, id_usuario) {
                'idProducto', ci.id_producto,
                'cantidad', ci.cantidad,
                'precioUnitario', ci.precio_unitario,
-               'precioTotal', ci.precio_total
+               'precioTotal', ci.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
              )
            ) FILTER (WHERE ci.id_item IS NOT NULL), '[]') AS items
     FROM public.compras c
     LEFT JOIN public.compras_items ci ON ci.id_compra = c.id_compra
+    LEFT JOIN public.productos p ON p.id_producto::text = ci.id_producto::text
     WHERE c.id_compra = $1 AND c.id_usuario = $2
     GROUP BY c.id_compra;
   `;
@@ -92,16 +95,46 @@ async function getPurchases(id_usuario) {
                'idProducto', ci.id_producto,
                'cantidad', ci.cantidad,
                'precioUnitario', ci.precio_unitario,
-               'precioTotal', ci.precio_total
+               'precioTotal', ci.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
              )
            ) FILTER (WHERE ci.id_item IS NOT NULL), '[]') AS items
     FROM public.compras c
     LEFT JOIN public.compras_items ci ON ci.id_compra = c.id_compra
+    LEFT JOIN public.productos p ON p.id_producto::text = ci.id_producto::text
     WHERE c.id_usuario = $1
     GROUP BY c.id_compra
     ORDER BY c.fecha DESC, c.id_compra DESC;
   `;
   const { rows } = await db.query(query, [id_usuario]);
+  return rows;
+}
+
+async function getPurchasesByDateRange(id_usuario, fechaInicio, fechaFin) {
+  const query = `
+    SELECT c.*,
+           COALESCE(json_agg(
+             json_build_object(
+               'idItem', ci.id_item,
+               'idProducto', ci.id_producto,
+               'cantidad', ci.cantidad,
+               'precioUnitario', ci.precio_unitario,
+               'precioTotal', ci.precio_total,
+               'productoNombre', p.nombre,
+               'productoReferencia', p.referencia
+             )
+           ) FILTER (WHERE ci.id_item IS NOT NULL), '[]') AS items
+    FROM public.compras c
+    LEFT JOIN public.compras_items ci ON ci.id_compra = c.id_compra
+    LEFT JOIN public.productos p ON p.id_producto::text = ci.id_producto::text
+    WHERE c.id_usuario = $1
+      AND c.fecha >= $2
+      AND c.fecha <= $3
+    GROUP BY c.id_compra
+    ORDER BY c.fecha DESC, c.id_compra DESC;
+  `;
+  const { rows } = await db.query(query, [id_usuario, fechaInicio, fechaFin]);
   return rows;
 }
 
@@ -185,8 +218,8 @@ module.exports = {
   ensureComprasSchema,
   createPurchase,
   getPurchases,
+  getPurchasesByDateRange,
   getPurchaseById,
   updatePurchase,
   deletePurchase,
 };
-
