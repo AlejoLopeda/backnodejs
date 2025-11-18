@@ -54,24 +54,56 @@ function validateItemsLimits(items) {
   }
 }
 
+function resolveProductId(item) {
+  const candidates = [
+    item.productId,
+    item.product_id,
+    item.idProducto,
+    item.id_producto,
+    item.productoId,
+    item.productoID,
+    item.producto_id,
+    item.productID,
+    item.id,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === '') {
+      continue;
+    }
+
+    if (isPositiveInt(candidate)) {
+      return Number(candidate);
+    }
+
+    if (typeof candidate === 'string') {
+      const match = candidate.trim().match(/^(\d+)/);
+      if (match && isPositiveInt(match[1])) {
+        return Number(match[1]);
+      }
+    }
+  }
+  return null;
+}
+
 function mapAndValidateItems(items) {
   validateItemsLimits(items);
   return items.map((it, i) => {
     if (it == null || typeof it !== 'object') {
       throw new Error(`items[${i}] debe ser un objeto`);
     }
-    const { productId, quantity, unitPrice } = it;
-    if (!isPositiveInt(productId)) {
+    const productId = resolveProductId(it);
+    const { quantity, unitPrice } = it;
+    if (productId === null) {
       throw new Error(`items[${i}].productId debe ser un entero positivo`);
     }
     if (!isPositiveInt(quantity) || Number(quantity) > LIMITS.maxQuantity) {
       throw new Error(`items[${i}].quantity debe ser un entero > 0 y <= ${LIMITS.maxQuantity}`);
     }
     if (!isNonNegativeNumber(unitPrice) || Number(unitPrice) > LIMITS.maxUnitPrice) {
-      throw new Error(`items[${i}].unitPrice debe ser un número entre 0 y ${LIMITS.maxUnitPrice}`);
+      throw new Error(`items[${i}].unitPrice debe ser un n�mero entre 0 y ${LIMITS.maxUnitPrice}`);
     }
     return {
-      id_producto: Number(productId),
+      id_producto: productId,
       cantidad: Number(quantity),
       precio_unitario: Number(Number(unitPrice).toFixed(2)),
     };
@@ -281,4 +313,5 @@ module.exports = {
   updateSale,
   deleteSale,
 };
+
 
