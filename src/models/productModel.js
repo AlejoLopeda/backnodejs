@@ -99,6 +99,16 @@ async function getProductById(idProducto) {
   return result.rows[0] || null;
 }
 
+async function getProducts() {
+  const query = `
+    SELECT *
+    FROM public.productos
+    ORDER BY nombre ASC, referencia ASC;
+  `;
+  const { rows } = await db.query(query);
+  return rows;
+}
+
 async function updateProduct(idProducto, data) {
   const { query, values } = buildUpdateStatement(idProducto, data);
   const result = await db.query(query, values);
@@ -119,6 +129,7 @@ module.exports = {
   ensureProductosSchema,
   createProduct,
   getProductById,
+  getProducts,
   updateProduct,
   deleteProduct,
 };
