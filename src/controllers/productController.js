@@ -188,6 +188,45 @@ function handleUniqueConstraintError(error, res) {
   return false;
 }
 
+async function listProducts(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    const products = await productModel.getProducts();
+    return res.json(products);
+  } catch (error) {
+    console.error('Error al listar productos:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+async function getProduct(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    const idProducto = resolveId(req.params?.idProducto, req.body || {});
+    if (!idProducto) {
+      return res.status(400).json({ error: 'idProducto es obligatorio' });
+    }
+
+    const product = await productModel.getProductById(idProducto);
+    if (!product) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    return res.json(product);
+  } catch (error) {
+    console.error('Error al obtener producto:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
 async function createProduct(req, res) {
   try {
     const userId = req.user?.id;
@@ -325,6 +364,8 @@ async function deleteProduct(req, res) {
 }
 
 module.exports = {
+  listProducts,
+  getProduct,
   createProduct,
   updateProduct,
   deleteProduct,
