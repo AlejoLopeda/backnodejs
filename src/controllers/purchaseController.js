@@ -3,6 +3,7 @@ const auditModel = require('../models/auditModel');
 
 // Límites y utilidades de validación
 const LIMITS = {
+  minItems: 21, // se exige más de 20 items
   maxItems: 100,
   maxNotesLength: 1000,
   maxQuantity: 100000,
@@ -57,6 +58,9 @@ function validateHeader(payload) {
 function validateItemsLimits(items) {
   if (!Array.isArray(items) || !items.length) {
     throw new Error('items es obligatorio y debe ser un arreglo con al menos un elemento');
+  }
+  if (items.length < LIMITS.minItems) {
+    throw new Error(`items debe tener al menos ${LIMITS.minItems} elementos (más de 20)`);
   }
   if (items.length > LIMITS.maxItems) {
     throw new Error(`items no debe tener más de ${LIMITS.maxItems} elementos`);
