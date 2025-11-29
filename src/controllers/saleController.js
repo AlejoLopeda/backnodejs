@@ -3,12 +3,17 @@ const auditModel = require('../models/auditModel');
 
 // Límites y utilidades de validación
 const LIMITS = {
-  minItems: 21, // se exige más de 20 items
+  minItems: 1, // se permite desde 1 item
   maxItems: 100,
   maxQuantity: 100000,
   maxUnitPrice: 100000000, // 1e8
   maxMetodoPagoLength: 50,
 };
+
+function isUUID(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+}
 
 function isPositiveInt(value) {
   const n = Number(value);
@@ -30,9 +35,9 @@ function validateFecha(fecha) {
 }
 
 function validateHeader(payload) {
-  if (payload.idCliente !== undefined && payload.idCliente !== null) {
-    if (!isPositiveInt(payload.idCliente)) {
-      throw new Error('idCliente debe ser un entero positivo');
+  if (payload.idCliente !== undefined && payload.idCliente !== null && payload.idCliente !== '') {
+    if (!isUUID(String(payload.idCliente))) {
+      throw new Error('idCliente debe ser un UUID válido');
     }
   }
   if (payload.metodoPago !== undefined && payload.metodoPago !== null) {
@@ -50,9 +55,6 @@ function validateItemsLimits(items) {
   if (!Array.isArray(items) || !items.length) {
     throw new Error('items es obligatorio y debe ser un arreglo con al menos un elemento');
   }
-  if (items.length < LIMITS.minItems) {
-    throw new Error(`items debe tener al menos ${LIMITS.minItems} elementos (más de 20)`);
-  }
   if (items.length > LIMITS.maxItems) {
     throw new Error(`items no debe tener más de ${LIMITS.maxItems} elementos`);
   }
@@ -65,8 +67,13 @@ function mapAndValidateItems(items) {
       throw new Error(`items[${i}] debe ser un objeto`);
     }
     const { productId, quantity, unitPrice } = it;
-    if (!isPositiveInt(productId)) {
-      throw new Error(`items[${i}].productId debe ser un entero positivo`);
+    let mappedProductId;
+    if (isUUID(String(productId))) {
+      mappedProductId = String(productId);
+    } else if (isPositiveInt(productId)) {
+      mappedProductId = Number(productId);
+    } else {
+      throw new Error(`items[${i}].productId debe ser un UUID o un entero positivo`);
     }
     if (!isPositiveInt(quantity) || Number(quantity) > LIMITS.maxQuantity) {
       throw new Error(`items[${i}].quantity debe ser un entero > 0 y <= ${LIMITS.maxQuantity}`);
@@ -75,7 +82,7 @@ function mapAndValidateItems(items) {
       throw new Error(`items[${i}].unitPrice debe ser un número entre 0 y ${LIMITS.maxUnitPrice}`);
     }
     return {
-      id_producto: Number(productId),
+      id_producto: mappedProductId,
       cantidad: Number(quantity),
       precio_unitario: Number(Number(unitPrice).toFixed(2)),
     };
@@ -182,8 +189,8 @@ async function getSale(req, res) {
   try {
     const userId = req.user?.id;
     const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    if (!isUUID(String(idVenta))) {
+      return res.status(400).json({ error: 'idVenta debe ser un UUID válido' });
     }
     const sale = await saleModel.getSaleById(idVenta, userId);
     if (!sale) return res.status(404).json({ error: 'Venta no encontrada' });
@@ -198,8 +205,8 @@ async function updateSale(req, res) {
   try {
     const userId = req.user?.id;
     const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    if (!isUUID(String(idVenta))) {
+      return res.status(400).json({ error: 'idVenta debe ser un UUID válido' });
     }
     const payload = req.body || {};
 
@@ -249,8 +256,8 @@ async function deleteSale(req, res) {
   try {
     const userId = req.user?.id;
     const { idVenta } = req.params;
-    if (!isPositiveInt(idVenta)) {
-      return res.status(400).json({ error: 'idVenta debe ser un entero positivo' });
+    if (!isUUID(String(idVenta))) {
+      return res.status(400).json({ error: 'idVenta debe ser un UUID válido' });
     }
 
     const existing = await saleModel.getSaleById(idVenta, userId);

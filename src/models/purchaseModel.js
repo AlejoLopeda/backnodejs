@@ -15,10 +15,10 @@ async function ensureComprasSchema() {
   `;
 
   const { rows } = await db.query(checkQuery);
-  if (rows[0]?.existe) return;
-
-  const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
-  await db.query(migrationSql);
+  if (!rows[0]?.existe) {
+    const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
+    await db.query(migrationSql);
+  }
 }
 
 function calcularTotales(items) {

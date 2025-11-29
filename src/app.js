@@ -36,12 +36,12 @@ app.use(['/productos', '/producto'], productRoutes);
     console.log('Tabla usuarios creada o ya existe');
     await ensureClientesSchema();
     console.log('Recursos de clientes creados o ya existen');
+    await ensureProductosSchema();
+    console.log('Recursos de productos creados o ya existen');
     await ensureVentasSchema();
     console.log('Recursos de ventas creados o ya existen');
     await ensureComprasSchema();
     console.log('Recursos de compras creados o ya existen');
-    await ensureProductosSchema();
-    console.log('Recursos de productos creados o ya existen');
     await ensureAuditoriaSchema();
     console.log('Recursos de auditoria creados o ya existen');
   } catch (error) {

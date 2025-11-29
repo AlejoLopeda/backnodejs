@@ -3,6 +3,8 @@ const path = require('path');
 const db = require('../db');
 
 const MIGRATION_FILE = path.join(__dirname, '..', '..', 'migrations', 'migrate_sales_up.sql');
+let ensureReadyPromise = null;
+let cachedIdProductoType = null;
 
 async function ensureVentasSchema() {
   const checkQuery = `
@@ -15,10 +17,43 @@ async function ensureVentasSchema() {
   `;
 
   const { rows } = await db.query(checkQuery);
-  if (rows[0]?.existe) return;
+  if (!rows[0]?.existe) {
+    const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
+    await db.query(migrationSql);
+  }
+}
 
-  const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
-  await db.query(migrationSql);
+async function ensureReady() {
+  if (!ensureReadyPromise) {
+    ensureReadyPromise = ensureVentasSchema().catch((err) => {
+      ensureReadyPromise = null;
+      throw err;
+    });
+  }
+  return ensureReadyPromise;
+}
+
+async function getIdProductoColumnType() {
+  if (cachedIdProductoType) return cachedIdProductoType;
+  const query = `
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ventas_items'
+      AND column_name = 'id_producto'
+    LIMIT 1;
+  `;
+  const { rows } = await db.query(query);
+  const type = rows?.[0]?.data_type || 'uuid';
+  cachedIdProductoType = type.toLowerCase();
+  return cachedIdProductoType;
+}
+
+function normalizeItemsForDb(items, idProductoType) {
+  return items.map((it) => {
+    const idProducto = idProductoType === 'integer' ? Number(it.id_producto) : String(it.id_producto);
+    return { ...it, id_producto: idProducto };
+  });
 }
 
 function calcularTotales(items) {
@@ -33,9 +68,12 @@ function calcularTotales(items) {
 }
 
 async function createSale({ id_cliente, id_usuario, fecha, metodo_pago, items }) {
+  await ensureReady();
+  const idProductoType = await getIdProductoColumnType();
+  const itemsForDb = normalizeItemsForDb(items, idProductoType);
   await db.query('BEGIN');
   try {
-    const { total, itemsConTotales } = calcularTotales(items);
+    const { total, itemsConTotales } = calcularTotales(itemsForDb);
 
     const insertVenta = `
       INSERT INTO public.ventas (id_cliente, id_usuario, fecha, metodo_pago, total)
@@ -63,6 +101,7 @@ async function createSale({ id_cliente, id_usuario, fecha, metodo_pago, items })
 }
 
 async function getSaleById(id_venta, id_usuario) {
+  await ensureReady();
   const query = `
     SELECT v.*,
            COALESCE(json_agg(
@@ -84,6 +123,7 @@ async function getSaleById(id_venta, id_usuario) {
 }
 
 async function getSales(id_usuario) {
+  await ensureReady();
   const query = `
     SELECT v.*,
            COALESCE(json_agg(
@@ -106,12 +146,15 @@ async function getSales(id_usuario) {
 }
 
 async function updateSale(id_venta, id_usuario, { id_cliente, fecha, metodo_pago, items }) {
+  await ensureReady();
+  const idProductoType = await getIdProductoColumnType();
+  const itemsForDb = Array.isArray(items) ? normalizeItemsForDb(items, idProductoType) : items;
   await db.query('BEGIN');
   try {
     // Recalcular total si hay items
     let total = null;
     let itemsConTotales = null;
-    if (Array.isArray(items)) {
+    if (Array.isArray(itemsForDb)) {
       const calc = calcularTotales(items.map((i) => ({
         id_producto: i.id_producto,
         cantidad: i.cantidad,
@@ -129,7 +172,7 @@ async function updateSale(id_venta, id_usuario, { id_cliente, fecha, metodo_pago
     if (metodo_pago !== undefined) { sets.push(`metodo_pago = $${idx++}`); values.push(metodo_pago || null); }
     if (total !== null) { sets.push(`total = $${idx++}`); values.push(total); }
 
-    if (!sets.length && !Array.isArray(items)) {
+    if (!sets.length && !Array.isArray(itemsForDb)) {
       await db.query('ROLLBACK');
       throw new Error('No hay campos para actualizar');
     }
@@ -153,7 +196,7 @@ async function updateSale(id_venta, id_usuario, { id_cliente, fecha, metodo_pago
       if (!check.rows[0]) { await db.query('ROLLBACK'); return null; }
     }
 
-    if (Array.isArray(items)) {
+    if (Array.isArray(itemsForDb)) {
       await db.query('DELETE FROM public.ventas_items WHERE id_venta = $1', [id_venta]);
       const insertItem = `
         INSERT INTO public.ventas_items (id_venta, id_producto, cantidad, precio_unitario, precio_total)

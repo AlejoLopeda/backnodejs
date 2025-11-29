@@ -14,6 +14,7 @@ const FIELD_MAP = {
 };
 
 const ID_FIELD_NAMES = ['idProducto', 'id_producto'];
+const MAX_NUMERIC_LENGTH = 8;
 
 function isPlaceholder(value) {
   return typeof value === 'string' && /\{\{.*\}\}/.test(value);
@@ -78,7 +79,16 @@ function normalizePrecio(value) {
     throw new Error('precio es obligatorio');
   }
 
-  const parsed = Number(value);
+  const raw = String(value).trim();
+  const numericLength = raw.replace(/[^0-9]/g, '').length;
+  if (!raw.length) {
+    throw new Error('precio es obligatorio');
+  }
+  if (numericLength > MAX_NUMERIC_LENGTH) {
+    throw new Error(`precio no puede tener mas de ${MAX_NUMERIC_LENGTH} caracteres`);
+  }
+
+  const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
     throw new Error('precio debe ser numerico');
   }
@@ -96,13 +106,26 @@ function normalizeCantidad(value) {
   }
 
   if (typeof value === 'number' && Number.isInteger(value)) {
+    const digits = Math.abs(value).toString().replace(/[^0-9]/g, '').length;
+    if (digits > MAX_NUMERIC_LENGTH) {
+      throw new Error(`cantidad no puede tener mas de ${MAX_NUMERIC_LENGTH} caracteres`);
+    }
     if (value < 0) {
       throw new Error('cantidad no puede ser negativa');
     }
     return value;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const raw = String(value).trim();
+  const numericLength = raw.replace(/[^0-9]/g, '').length;
+  if (!raw.length) {
+    throw new Error('cantidad es obligatoria');
+  }
+  if (numericLength > MAX_NUMERIC_LENGTH) {
+    throw new Error(`cantidad no puede tener mas de ${MAX_NUMERIC_LENGTH} caracteres`);
+  }
+
+  const parsed = Number.parseInt(raw, 10);
   if (Number.isNaN(parsed)) {
     throw new Error('cantidad debe ser un numero entero');
   }

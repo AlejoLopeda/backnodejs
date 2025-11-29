@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.compras (
 CREATE TABLE IF NOT EXISTS public.compras_items (
   id_item UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   id_compra UUID NOT NULL REFERENCES public.compras(id_compra) ON UPDATE CASCADE ON DELETE CASCADE,
-  id_producto INTEGER NOT NULL,
+  id_producto UUID NOT NULL REFERENCES public.productos(id_producto) ON UPDATE CASCADE ON DELETE RESTRICT,
   cantidad INTEGER NOT NULL CHECK (cantidad > 0),
   precio_unitario NUMERIC(12,2) NOT NULL CHECK (precio_unitario >= 0),
   precio_total NUMERIC(12,2) NOT NULL CHECK (precio_total >= 0)

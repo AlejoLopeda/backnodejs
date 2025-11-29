@@ -18,6 +18,7 @@ const FIELD_MAP = {
   /* telefono: 'telefono', */
   fechaCreacion: 'fecha_creacion',
   registradoPor: 'registrado_por',
+   codigo: 'codigo'
 };
 
 const REQUIRED_FIELDS = [
@@ -49,6 +50,12 @@ function extractIdFromPayload(payload = {}) {
   }
   return null;
 }
+
+/* function validateCodigo(payload) {
+  if (payload.codigo <= 20) {
+    throw new Error('El codigo debe ser mayor a 20');  //EJERCICIO TIPO PARCIAL
+  }
+} */
 
 function resolveClientId(req) {
   const paramId = req.params?.idCliente;
@@ -173,8 +180,10 @@ async function createClient(req, res) {
     if (!userId) {
       return res.status(401).json({ error: 'Usuario no autenticado' });
     }
-
     const payload = req.body || {};
+    if (payload.codigo !== undefined) {   //Validación
+      validateCodigo(payload);
+    }
 
     validateRequiredFields(payload);
     validateEnumValues(payload);
