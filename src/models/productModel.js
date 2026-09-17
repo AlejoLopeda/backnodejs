@@ -4,7 +4,7 @@ const db = require('../db');
 
 const MIGRATION_FILE = path.join(__dirname, '..', '..', 'migrations', '20251101_create_productos.sql');
 
-const INSERTABLE_FIELDS = ['referencia', 'categoria', 'precio', 'nombre', 'cantidad'];
+const INSERTABLE_FIELDS = ['referencia', 'categoria', 'precio', 'nombre', 'cantidad', 'info'];
 const UPDATABLE_FIELDS = INSERTABLE_FIELDS;
 
 async function ensureProductosSchema() {
@@ -99,6 +99,16 @@ async function getProductById(idProducto) {
   return result.rows[0] || null;
 }
 
+async function listProducts() {
+  const query = `
+    SELECT *
+    FROM public.productos
+    ORDER BY fecha_creacion DESC;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+}
+
 async function updateProduct(idProducto, data) {
   const { query, values } = buildUpdateStatement(idProducto, data);
   const result = await db.query(query, values);
@@ -119,6 +129,7 @@ module.exports = {
   ensureProductosSchema,
   createProduct,
   getProductById,
+  listProducts,
   updateProduct,
   deleteProduct,
 };

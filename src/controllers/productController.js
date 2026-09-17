@@ -1,6 +1,6 @@
 const productModel = require('../models/productModel');
 
-const REQUIRED_FIELDS = ['referencia', 'categoria', 'precio', 'nombre', 'cantidad'];
+const REQUIRED_FIELDS = ['referencia', 'categoria', 'precio', 'nombre', 'cantidad', 'info'];
 
 const FIELD_MAP = {
   idProducto: 'id_producto',
@@ -10,6 +10,7 @@ const FIELD_MAP = {
   precio: 'precio',
   nombre: 'nombre',
   cantidad: 'cantidad',
+  info: 'info',
 };
 
 const ID_FIELD_NAMES = ['idProducto', 'id_producto'];
@@ -88,7 +89,23 @@ function normalizePrecio(value) {
 
   return parsed;
 }
+function normalizeInfo(value) {
+  if (value === undefined || value === null || value === '') {
+    
+    throw new Error('precio es obligatorio');
+  }
 
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error('precio debe ser numerico');
+  }
+
+  if (parsed < 0) {
+    throw new Error('precio no puede ser negativo');
+  }
+
+  return parsed;
+}
 function normalizeCantidad(value) {
   if (value === undefined || value === null || value === '') {
     throw new Error('cantidad es obligatoria');
@@ -102,8 +119,9 @@ function normalizeCantidad(value) {
   }
 
   const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
+  if (Number.isNaN(parsed) ) {
     throw new Error('cantidad debe ser un numero entero');
+
   }
 
   if (parsed < 0) {
@@ -161,6 +179,11 @@ function mapPayloadToColumns(payload, { allowPartial = false, excludeFields = []
 
     if (inputField === 'cantidad') {
       mapped[columnName] = normalizeCantidad(rawValue);
+      return;
+    }
+
+    if (inputField === 'info') {
+      mapped[columnName] = normalizeInfo(rawValue);
       return;
     }
 
@@ -267,8 +290,39 @@ async function deleteProduct(req, res) {
   }
 }
 
+async function listProducts(req, res) {
+  try {
+    const products = await productModel.listProducts();
+    return res.status(200).json(products);
+  } catch (error) {
+    console.error('Error al listar productos:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+async function getProduct(req, res) {
+  try {
+    const idProducto = resolveId(req.params?.idProducto, {});
+    if (!idProducto) {
+      return res.status(400).json({ error: 'idProducto es obligatorio' });
+    }
+
+    const product = await productModel.getProductById(idProducto);
+    if (!product) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    return res.status(200).json(product);
+  } catch (error) {
+    console.error('Error al obtener producto:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
 module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  listProducts,
+  getProduct,
 };
